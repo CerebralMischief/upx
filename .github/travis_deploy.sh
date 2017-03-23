@@ -35,9 +35,10 @@ else
     branch=$TRAVIS_BRANCH
     if [[ "$TRAVIS_PULL_REQUEST" != "false" ]]; then exit 0; fi
 fi
-subdir=${subdir%%:*}; subdir=${subdir%%/*}; subdir=${subdir%%-*}
+subdir=${subdir%%:*}; subdir=${subdir%%/*}; subdir=${subdir%%--*}
 case $branch in
     devel*) ;;
+    gitlab*) ;;
     master*) ;;
     travis*) ;;
     *) exit 0;;

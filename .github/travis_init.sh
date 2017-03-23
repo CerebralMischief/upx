@@ -49,6 +49,7 @@ if [[ -z $CC_OVERRIDE ]]; then
 CC=false CXX=false SCAN_BUILD=false
 AR=ar SIZE=size
 if [[ -n $APPVEYOR_JOB_ID ]]; then
+    BUILD_LOCAL_UCL=1
     BUILD_LOCAL_ZLIB=1
     if [[ $BM_C =~ (^|\-)(clang|gcc)($|\-) ]]; then
         export upx_EXTRA_LDFLAGS="-static-libgcc -static-libstdc++"
@@ -65,6 +66,7 @@ if [[ -n $APPVEYOR_JOB_ID ]]; then
     esac
 fi # APPVEYOR_JOB_ID
 if [[ -n $BM_CROSS ]]; then
+    BUILD_LOCAL_UCL=1
     BUILD_LOCAL_ZLIB=1
     if [[ $BM_C =~ (^|\-)(clang|gcc)($|\-) ]]; then
         export upx_EXTRA_LDFLAGS="-static-libgcc -static-libstdc++"
