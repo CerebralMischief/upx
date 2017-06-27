@@ -34,35 +34,41 @@ amdbxx:  # (*f_unf)(xo->buf, out_len, h.b_cto8, h.b_ftid);
 #define ftid %arg4l
 
 #ifndef NO_METHOD_CHECK
-        cmpl $0x49,ftid; jne ckend  # filter: JMP, CALL, 6-byte Jxx
-        movq len,%rcx  # byte count
+        cmpl $0x49,ftid; jne ckend0  # filter: JMP, CALL, 6-byte Jxx
 #endif
-        movq ptr,%rsi  # remember start of buffer
+        push %rbx  # save
+
+        push %rdi; lea (1- 4)(%rdi,%rsi),%rcx  # beyond last possible displacement
+        pop  %rsi  # start of buffer
+        push %rsi
+        pop  %rbx  # remember start of buffer
         jmp ckstart
+ckloop4:
+        cmpq %rcx,%rsi; jae ckend
+        push %rsi  # tail merge
 ckloop3:
-        movb (%rdi),%al; addq $1,%rdi
+        pop %rsi; lodsb  # next main opcode
         cmpb $0x80,%al; jb ckloop2  # lo of 6-byte Jcc
         cmpb $0x8F,%al; ja ckloop2  # hi of 6-byte Jcc
-        cmpb $0x0F,-2(%rdi); je ckmark  # prefix of 6-byte Jcc
+        cmpb $0x0F,-2(%rsi); je ckmark  # prefix of 6-byte Jcc
 ckloop2:
         subb $     0xE8,%al
-        cmpb $0xE9-0xE8,%al; ja ckcount  # not JMP, not CALL
+        cmpb $0xE9-0xE8,%al; ja ckloop4  # not JMP, not CALL
 ckmark:
-        cmpb %dl,(%rdi); jne ckcount  # not marked with cto8
-        movl (%rdi),%eax  # the marked, bswapped 32-bit displacement
-        andl $~0<<8,%eax  # clear the mark
-        bswap %eax
-        subl %edi,%eax
-        addl %esi,%eax
-        stosl  # *%rdi++ = %eax;
+        cmpq %rcx,%rsi; jae ckend  # peek only; not marked ==> do not consume
+        push %rsi; lodsl  # (assume) marked, bswapped 32-bit displacement
+        subb %dl,%al; jne ckloop3  # not marked with cto8
+        pop %rdi
+        bswap %eax  # (0<<24) | d24
+        subl %edi,%eax  # hardware: %esi;  software: %edi  [ 4==delta ]
+        addl %ebx,%eax
+        stosl
 ckstart:
-        subq $4,%rcx
-        movb (%rdi),%al; addq $1,%rdi
-        decq %rcx; jnz ckloop2  # prefix cannot overlap previous displacement
-        jmp ckend
-ckcount:
-        decq %rcx; jnz ckloop3
+        cmpq %rcx,%rsi; jae ckend
+        lodsb; jmp ckloop2  # 0x0F prefix would overlap previous displacement
 ckend:
+        pop %rbx  # restore
+ckend0:
 #ifndef NO_METHOD_CHECK
         ret
 #endif

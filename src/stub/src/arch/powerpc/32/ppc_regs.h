@@ -5,12 +5,15 @@
 #define r1 1
 #define r2 2
 
+#define r27 27
+#define r28 28
 #define r29 29
 #define r30 30
 #define r31 31
 
 /* Stack pointer */
 #define sp 1
+SZ_FRAME= 6*4  // (sp,cr,lr, xx,yy,zz) save area per calling convention
 
 /* Subroutine arguments; not saved by callee */
 #define a0 3
@@ -27,6 +30,8 @@
 #define t1 11
 #define t2 12
 #define t3 13
+/* t4 is unofficial */
+#define t4 14
 
 /* branch and link */
 #define call bl

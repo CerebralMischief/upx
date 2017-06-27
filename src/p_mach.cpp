@@ -105,7 +105,7 @@ PackMachBase<T>::PackMachBase(InputFile *f, unsigned cputype, unsigned filetype,
     super(f), my_cputype(cputype), my_filetype(filetype), my_thread_flavor(flavor),
     my_thread_state_word_count(count), my_thread_command_size(size),
     n_segment(0), rawmseg(NULL), msegcmd(NULL), o_routines_cmd(0),
-    prev_init_address(0)
+    prev_init_address(0), pagezero_vmsize(0)
 {
     MachClass::compileTimeAssertions();
     bele = N_BELE_CTP::getRTP((const BeLePolicy*) NULL);
@@ -366,7 +366,7 @@ void PackMachAMD64::addStubEntrySections(Filter const * /*ft*/)
         ( M_IS_NRV2E(ph.method) ? "NRV_HEAD,NRV2E,NRV_TAIL"
         : M_IS_NRV2D(ph.method) ? "NRV_HEAD,NRV2D,NRV_TAIL"
         : M_IS_NRV2B(ph.method) ? "NRV_HEAD,NRV2B,NRV_TAIL"
-        : M_IS_LZMA(ph.method)  ? "LZMA_ELF00,+80C,LZMA_DEC20,LZMA_DEC30"
+        : M_IS_LZMA(ph.method)  ? "LZMA_ELF00,LZMA_DEC20,LZMA_DEC30"
         : NULL), NULL);
     if (hasLoaderSection("CFLUSH"))
         addLoader("CFLUSH");
@@ -390,7 +390,7 @@ void PackMachPPC32::addStubEntrySections(Filter const * /*ft*/)
         ( M_IS_NRV2E(ph.method) ? "NRV_HEAD,NRV2E,NRV_TAIL"
         : M_IS_NRV2D(ph.method) ? "NRV_HEAD,NRV2D,NRV_TAIL"
         : M_IS_NRV2B(ph.method) ? "NRV_HEAD,NRV2B,NRV_TAIL"
-        : M_IS_LZMA(ph.method)  ? "LZMA_ELF00,+80C,LZMA_DEC20,LZMA_DEC30"
+        : M_IS_LZMA(ph.method)  ? "LZMA_ELF00,LZMA_DEC20,LZMA_DEC30"
         : NULL), NULL);
     if (hasLoaderSection("CFLUSH"))
         addLoader("CFLUSH");
@@ -408,7 +408,7 @@ void PackMachARMEL::addStubEntrySections(Filter const * /*ft*/)
         ( M_IS_NRV2E(ph.method) ? "NRV_HEAD,NRV2E,NRV_TAIL"
         : M_IS_NRV2D(ph.method) ? "NRV_HEAD,NRV2D,NRV_TAIL"
         : M_IS_NRV2B(ph.method) ? "NRV_HEAD,NRV2B,NRV_TAIL"
-        : M_IS_LZMA(ph.method)  ? "LZMA_ELF00,+80C,LZMA_DEC20,LZMA_DEC30"
+        : M_IS_LZMA(ph.method)  ? "LZMA_ELF00,LZMA_DEC20,LZMA_DEC30"
         : NULL), NULL);
     if (hasLoaderSection("CFLUSH"))
         addLoader("CFLUSH");
@@ -423,7 +423,7 @@ void PackMachARM64EL::addStubEntrySections(Filter const * /*ft*/)
         ( M_IS_NRV2E(ph.method) ? "NRV_HEAD,NRV2E,NRV_TAIL"
         : M_IS_NRV2D(ph.method) ? "NRV_HEAD,NRV2D,NRV_TAIL"
         : M_IS_NRV2B(ph.method) ? "NRV_HEAD,NRV2B,NRV_TAIL"
-        : M_IS_LZMA(ph.method)  ? "LZMA_ELF00,+80C,LZMA_DEC20,LZMA_DEC30"
+        : M_IS_LZMA(ph.method)  ? "LZMA_ELF00,LZMA_DEC20,LZMA_DEC30"
         : NULL), NULL);
     if (hasLoaderSection("CFLUSH"))
         addLoader("CFLUSH");
@@ -647,6 +647,11 @@ void PackMachBase<T>::pack4(OutputFile *fo, Filter &ft)  // append PackHeader
         case Mach_segment_command::LC_SEGMENT: // fall through
         case Mach_segment_command::LC_SEGMENT_64: {
             Mach_segment_command *const segptr = (Mach_segment_command *)lcp;
+            if (!strcmp("__PAGEZERO", segptr->segname)) {
+                if (pagezero_vmsize < 0xF0000000ull) {
+                    segptr->vmsize = pagezero_vmsize;
+                }
+            }
             if (!strcmp("__TEXT", segptr->segname)) {
                 segtxt = segptr;  // remember base for appending
                 sectxt = (Mach_section_command *)(1+ segptr);
@@ -1380,7 +1385,12 @@ void PackMachBase<T>::pack1(OutputFile *const fo, Filter &/*ft*/)  // generate e
     if __acc_cte(sizeof(segZERO.vmsize) == 8
     && mhdro.filetype == Mach_header::MH_EXECUTE
     && mhdro.cputype == Mach_header::CPU_TYPE_X86_64) {
-        segZERO.vmsize <<= 20;  // (1ul<<32)
+        if (pagezero_vmsize < 0xF0000000ull) {
+            segZERO.vmsize = pagezero_vmsize;
+        }
+        else {
+            segZERO.vmsize <<= 20;  // (1ul<<32)
+        }
     }
 
     segTEXT.cmd = lc_seg;
@@ -1521,10 +1531,14 @@ void PackMachBase<T>::unpack(OutputFile *fo)
     p_info hbuf;
     fi->readx(&hbuf, sizeof(hbuf));
     unsigned const orig_file_size = get_te32(&hbuf.p_filesize);
-    blocksize = get_te32(&hbuf.p_blocksize);
-    if (file_size > (off_t)orig_file_size || blocksize > orig_file_size
-    ||  blocksize > 0x05000000)  // emacs-21.2.1 was 0x01d47e6c (== 30703212)
+    blocksize = get_te32(&hbuf.p_blocksize);  // emacs-21.2.1 was 0x01d47e6c (== 30703212)
+    if (blocksize > orig_file_size || blocksize > 0x05000000)
         throwCantUnpack("file header corrupted");
+    if (file_size > (off_t)orig_file_size) {
+        opt->info_mode += !opt->info_mode ? 1 : 0;  // make visible
+        opt->backup = 1;
+        infoWarning("packed size too big; discarding appended data, keeping backup");
+    }
 
     ibuf.alloc(blocksize + OVERHEAD);
     b_info bhdr; memset(&bhdr, 0, sizeof(bhdr));
@@ -1867,6 +1881,11 @@ bool PackMachBase<T>::canPack()
 
     // Put LC_SEGMENT together at the beginning, ascending by .vmaddr.
     qsort(msegcmd, ncmds, sizeof(*msegcmd), compare_segment_command);
+
+    if (lc_seg==msegcmd[0].cmd && 0==msegcmd[0].vmaddr
+    &&  !strcmp("__PAGEZERO", msegcmd[0].segname)) {
+        pagezero_vmsize = msegcmd[0].vmsize;
+    }
 
     // Check alignment of non-null LC_SEGMENT.
     for (unsigned j= 0; j < ncmds; ++j) {

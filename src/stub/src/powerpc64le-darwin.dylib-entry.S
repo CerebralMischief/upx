@@ -101,7 +101,7 @@ CACHELINE=32
         ori dst0,dst0,-1+ CACHELINE  // highest addr on cache line
 cfl_nrv:
         dcbst  0,dst0  // initiate store (modified) cacheline to memory
-        cmpl cr0,dst0,dst  // did we cover the highest-addressed byte?
+        cmpld cr0,dst0,dst  // did we cover the highest-addressed byte?
         icbi   0,dst0  // discard instructions from cacheline
         addi     dst0,dst0,CACHELINE  // highest addr on next line
         blt  cr0,cfl_nrv  // not done yet
@@ -136,8 +136,6 @@ sz_b_info= 12
 #define l_unc 23
 #define l_cpr 22
 #define t_h   21  /* temporary */
-
-LINKAREA= 6*8  // (sp,pc,cr, xx,yy.zz) save area per calling convention
 
 PROT_NONE  =0x00
 PROT_READ  =0x01
@@ -259,13 +257,13 @@ dy_uncpr:
         mr a2,s_unc  # dst
         mr a3,sp  # &l_dst
         lbz a4,b_method(s_cpr)
-        la sp,-LINKAREA(sp)
+        stdu sp,-SZ_FRAME(sp)
         blrl  # uncompress
-        la sp,8+LINKAREA(sp)
+        la sp,8+SZ_FRAME(sp)
                 // FIXME: check status
 
         lbz a3,b_ftid(s_cpr)
-        cmpli cr0,a3,0
+        cmplwi cr0,a3,0
         beq dy_uncpr
         lbz a2,b_cto8(s_cpr)
         ld a1,sz_unc(s_cpr)

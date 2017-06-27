@@ -63,7 +63,6 @@ protected:
     virtual void addStubEntrySections(Filter const *);
     virtual void unpack(OutputFile *fo);
 
-    //virtual void const *elf_find_dynamic(unsigned) const = 0;
     virtual upx_uint64_t elf_unsigned_dynamic(unsigned) const = 0;
     static unsigned elf_hash(char const *) /*const*/;
     static unsigned gnu_hash(char const *) /*const*/;
@@ -143,6 +142,7 @@ protected:
 
     virtual Elf32_Sym const *elf_lookup(char const *) const;
     virtual unsigned elf_get_offset_from_address(unsigned) const;
+    Elf32_Phdr const *elf_find_ptype(unsigned type, Elf32_Phdr const *phdr0, unsigned phnum);
     Elf32_Shdr const *elf_find_section_name(char const *) const;
     Elf32_Shdr const *elf_find_section_type(unsigned) const;
     void const *elf_find_dynamic(unsigned) const;
@@ -152,11 +152,13 @@ protected:
 protected:
     Elf32_Ehdr  ehdri; // from input file
     Elf32_Phdr *phdri; // for  input file
+    Elf32_Shdr const *shdri; // from input file
+    Elf32_Phdr const *gnu_stack;  // propagate NX
     unsigned e_phoff;
     unsigned e_shoff;
+    unsigned so_slide;
     unsigned char *note_body;  // concatenated contents of PT_NOTEs, if any
     unsigned note_size;  // total size of PT_NOTEs
-    Elf32_Shdr const *shdri; // from input file
     unsigned page_mask;  // AND clears the offset-within-page
 
     Elf32_Dyn    const *dynseg;   // from PT_DYNAMIC
@@ -260,6 +262,7 @@ protected:
 
     virtual Elf64_Sym const *elf_lookup(char const *) const;
     virtual upx_uint64_t elf_get_offset_from_address(upx_uint64_t) const;
+    Elf64_Phdr const *elf_find_ptype(unsigned type, Elf64_Phdr const *phdr0, unsigned phnum);
     Elf64_Shdr const *elf_find_section_name(char const *) const;
     Elf64_Shdr const *elf_find_section_type(unsigned) const;
     void const *elf_find_dynamic(unsigned) const;
@@ -269,11 +272,13 @@ protected:
 protected:
     Elf64_Ehdr  ehdri; // from input file
     Elf64_Phdr *phdri; // for  input file
+    Elf64_Shdr const *shdri; // from input file
+    Elf64_Phdr const *gnu_stack;  // propagate NX
     upx_uint64_t e_phoff;
     upx_uint64_t e_shoff;
+    unsigned so_slide;
     unsigned char *note_body;  // concatenated contents of PT_NOTEs, if any
     unsigned note_size;  // total size of PT_NOTEs
-    Elf64_Shdr const *shdri; // from input file
     upx_uint64_t page_mask;  // AND clears the offset-within-page
 
     Elf64_Dyn    const *dynseg;   // from PT_DYNAMIC
@@ -377,6 +382,25 @@ public:
     virtual int getFormat() const { return UPX_F_LINUX_ELF64_AMD; }
     virtual const char *getName() const { return "linux/amd64"; }
     virtual const char *getFullName(const options_t *) const { return "amd64-linux.elf"; }
+    virtual const int *getFilters() const;
+    virtual bool canPack();
+protected:
+    virtual void pack1(OutputFile *, Filter &);  // generate executable header
+    //virtual void pack3(OutputFile *, Filter &);  // append loader
+    virtual void buildLoader(const Filter *);
+    virtual Linker* newLinker() const;
+    virtual void defineSymbols(Filter const *);
+};
+
+class PackLinuxElf64arm : public PackLinuxElf64Le
+{
+    typedef PackLinuxElf64Le super;
+public:
+    PackLinuxElf64arm(InputFile *f);
+    virtual ~PackLinuxElf64arm();
+    virtual int getFormat() const { return UPX_F_LINUX_ELF64_ARM; }
+    virtual const char *getName() const { return "linux/arm64"; }
+    virtual const char *getFullName(const options_t *) const { return "arm64-linux.elf"; }
     virtual const int *getFilters() const;
     virtual bool canPack();
 protected:

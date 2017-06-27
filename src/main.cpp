@@ -33,7 +33,7 @@
 #include "p_elf.h"
 
 
-#if 1 && defined(__DJGPP__)
+#if 1 && (ACC_OS_DOS32) && defined(__DJGPP__)
 #include <crt0.h>
 int _crt0_startup_flags = _CRT0_FLAG_UNIX_SBRK;
 #endif
@@ -61,7 +61,7 @@ void options_t::reset()
     o->preserve_timestamp = true;
 
     o->console = CON_FILE;
-#if defined(__DJGPP__)
+#if (ACC_OS_DOS32) && defined(__DJGPP__)
     o->console = CON_INIT;
 #elif (USE_SCREEN_WIN32)
     o->console = CON_INIT;
@@ -866,6 +866,9 @@ static int do_option(int optc, const char *arg)
     case 675:
         opt->o_unix.preserve_build_id = true;
         break;
+    case 676:
+        opt->o_unix.android_shlib = true;
+        break;
 
     case '\0':
         return -1;
@@ -1016,6 +1019,7 @@ static const struct mfx_option longopts[] =
     {"openbsd",          0x10, 0, 669},
     {"unmap-all-pages",  0x10, 0, 674},     // linux /proc/self/exe vanishes
     {"preserve-build-id",   0, 0, 675},
+    {"android-shlib",       0, 0, 676},
     // watcom/le
     {"le",               0x10, 0, 620},     // produce LE output
     // win32/pe
@@ -1409,7 +1413,7 @@ int __acc_cdecl_main main(int argc, char *argv[])
     static char default_argv0[] = "upx";
 //    int cmdline_cmd = CMD_NONE;
 
-#if 0 && defined(__DJGPP__)
+#if 0 && (ACC_OS_DOS32) && defined(__DJGPP__)
     // LFN=n may cause problems with 2.03's _rename and mkdir under WinME
     putenv("LFN=y");
 #endif

@@ -73,7 +73,8 @@
         EM_PPC    = 20,
         EM_PPC64  = 21,
         EM_ARM    = 40,
-        EM_X86_64 = 62
+        EM_X86_64 = 62,
+        EM_AARCH64 = 183
 
     };
     enum { // e_version
@@ -90,6 +91,7 @@
         PT_INTERP  = 3,         /* Name of program interpreter */
         PT_NOTE    = 4,         /* Auxiliary information (esp. OpenBSD) */
         PT_PHDR    = 6          /* Entry for header table itself */
+        , PT_GNU_STACK = 0x6474e551      /* Indicates stack executability */
     };
 
     enum { // p_flags
@@ -122,6 +124,8 @@
         SHT_GROUP = 17,         /* Section group */
         SHT_SYMTAB_SHNDX = 18,  /* Extended section indeces */
         SHT_GNU_LIBLIST = 0x6ffffff7    /* Prelink library list */
+
+        , SHT_LOOS = 0x60000000  /* LOcal OS; SHT_ANDROID_REL{,A} is +1, +2 */
     };
 
     enum { // sh_flags

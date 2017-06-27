@@ -87,7 +87,7 @@ CACHELINE=32
         ori dst0,dst0,-1+ CACHELINE  // highest addr on cache line
 cfl_nrv:
         dcbst  0,dst0  // initiate store (modified) cacheline to memory
-        cmpl cr0,dst0,dst  // did we cover the highest-addressed byte?
+        cmpld cr0,dst0,dst  // did we cover the highest-addressed byte?
         icbi   0,dst0  // discard instructions from cacheline
         addi     dst0,dst0,CACHELINE  // highest addr on next line
         blt  cr0,cfl_nrv  // not done yet
@@ -127,7 +127,7 @@ movup:  # descending copy moves folded_loader to higher address
         addi dst,t0,GAP  # &unfolded result
         std ldst,-8(sp)  # LZMA needs for EOF
         la  ldst,-8(sp)  # &sz_result
-        la sp,-6*8(sp)  // (sp,cr,pc, xx,yy,zz) save area per calling convention
+        stdu sp,-SZ_FRAME(sp)  // ABI convention (for lzma compiled by gcc)
         bctr  # call decompress: branch to counter register, return to link register
 
 main:

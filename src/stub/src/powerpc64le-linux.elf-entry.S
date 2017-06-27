@@ -114,7 +114,7 @@ CACHELINE=32
         ori dst0,dst0,-1+ CACHELINE  // highest addr on cache line
 cfl_nrv:
         dcbst  0,dst0  // initiate store (modified) cacheline to memory
-        cmpl cr0,dst0,dst  // did we cover the highest-addressed byte?
+        cmpld cr0,dst0,dst  // did we cover the highest-addressed byte?
         icbi   0,dst0  // discard instructions from cacheline
         addi     dst0,dst0,CACHELINE  // highest addr on next line
         blt  cr0,cfl_nrv  // not done yet
@@ -129,6 +129,7 @@ msg_SELinux:
         call L72
 L70:
         .asciz "PROT_EXEC|PROT_WRITE failed.\n"
+        .align 4
 L71:
         // IDENTSTR goes here
 
@@ -170,8 +171,8 @@ unfold:
         mtlr   a0  // &continuation
         lwz lsrc,sz_cpr(r30)        // size of compressed
         addi src,r30,sz_b_info
-        la sp,-6*8(sp)  // (sp,pc,cr, xx,yy,zz) save area per calling convention
-        bctr  // goto decomrpess; return to link register (mmap'ed page)
+        stdu sp,-SZ_FRAME(sp)  // ABI calling convention (for lzma compiled by gcc)
+        bctr  // goto decompress; return to link register (mmap'ed page)
 
 // Example code at entrypoint of C-language subroutine:
 //      mflr    r0  # r0= return address

@@ -49,6 +49,7 @@ if [[ -z $CC_OVERRIDE ]]; then
 CC=false CXX=false SCAN_BUILD=false
 AR=ar SIZE=size
 if [[ -n $APPVEYOR_JOB_ID ]]; then
+    BUILD_LOCAL_UCL=1
     BUILD_LOCAL_ZLIB=1
     if [[ $BM_C =~ (^|\-)(clang|gcc)($|\-) ]]; then
         export upx_EXTRA_LDFLAGS="-static-libgcc -static-libstdc++"
@@ -65,6 +66,7 @@ if [[ -n $APPVEYOR_JOB_ID ]]; then
     esac
 fi # APPVEYOR_JOB_ID
 if [[ -n $BM_CROSS ]]; then
+    BUILD_LOCAL_UCL=1
     BUILD_LOCAL_ZLIB=1
     if [[ $BM_C =~ (^|\-)(clang|gcc)($|\-) ]]; then
         export upx_EXTRA_LDFLAGS="-static-libgcc -static-libstdc++"
@@ -148,7 +150,7 @@ case $BM_C in
     clang*-m64) CC="$CC -m64";  CXX="$CXX -m64" ;;
     gcc*-m32)   CC="$CC -m32";  CXX="$CXX -m32" ;;
     gcc*-m64)   CC="$CC -m64";  CXX="$CXX -m64" ;;
-    gcc*-mx32)  CC="$CC -mx32"; CXX="$CXX -mx32" ;;
+    gcc*-mx32)  CC="$CC -mx32"; CXX="$CXX -mx32"; BUILD_LOCAL_UCL=1; BUILD_LOCAL_ZLIB=1 ;;
 esac
 if [[ $BM_C =~ (^|\-)(clang|gcc)($|\-) ]]; then
     CC="$CC -std=gnu89"
@@ -212,6 +214,11 @@ done
 make_absolute lcov_OUTPUTDIR
 unset var_prefix var_suffix
 
+print_header() {
+    local x="==========="; x="$x$x$x$x$x$x$x"
+    echo -e "\n${x}\n${1}\n${x}\n"
+}
+
 print_settings() {
     local v var_prefix var_suffix
     # Build Matrix
@@ -235,6 +242,15 @@ print_settings() {
     done
     done
     ##env | LC_ALL=C sort
+}
+
+fix_home_ssh_perms() {
+    if [[ -d ~/.ssh ]]; then
+        if [[ -x /usr/sbin/restorecon ]]; then
+            /usr/sbin/restorecon -v -R ~/.ssh || true
+        fi
+        chmod -c -R go-rwx ~/.ssh || true
+    fi
 }
 
 true

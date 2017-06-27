@@ -1,5 +1,6 @@
 /.bzr*
 /.hg*
+/.vscode*
 /Makevars.global*
 /build*
 /maint*
@@ -43,7 +44,6 @@ src/stub/tmp*/*.bin
 src/stub/tmp*/*.bin.bindump
 src/stub/tmp*/*.bin.disasm
 src/stub/tmp*/*.d
-src/stub/tmp*/*.map
 src/stub/tmp*/*.o
 src/stub/tmp*/*.o.disasm
 src/stub/tmp*/mips.r3000-*.[is]

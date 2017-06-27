@@ -37,8 +37,9 @@ include $(wildcard $(top_srcdir)/Makevars.global ./Makevars.local)
 # update $PATH for our special stub build tools
 ifneq ($(wildcard $(HOME)/local/bin/bin-upx/upx-stubtools-check-version),)
 export PATH := $(HOME)/local/bin/bin-upx:$(PATH)
-endif
-ifneq ($(wildcard $(HOME)/bin/bin-upx/upx-stubtools-check-version),)
+else ifneq ($(wildcard $(HOME)/.local/bin/bin-upx/upx-stubtools-check-version),)
+export PATH := $(HOME)/.local/bin/bin-upx:$(PATH)
+else ifneq ($(wildcard $(HOME)/bin/bin-upx/upx-stubtools-check-version),)
 export PATH := $(HOME)/bin/bin-upx:$(PATH)
 endif
 
@@ -71,12 +72,14 @@ STUBS += arm.v5a-linux.kernel.vmlinux.h
 STUBS += arm.v5a-linux.kernel.vmlinuz-head.h
 STUBS += arm.v5a-linux.kernel.vmlinuz.h
 STUBS += arm.v5a-linux.shlib-init.h
-STUBS += arm.v5a-linux.shlib-init.h
 STUBS += arm.v5t-linux.shlib-init.h
 STUBS += armeb.v4a-linux.elf-entry.h
 STUBS += armeb.v4a-linux.elf-fold.h
 STUBS += armeb.v5a-linux.kernel.vmlinux-head.h
 STUBS += armeb.v5a-linux.kernel.vmlinux.h
+STUBS += arm64-linux.elf-entry.h
+STUBS += arm64-linux.elf-fold.h
+STUBS += arm64-linux.shlib-init.h
 STUBS += arm64-darwin.macho-entry.h
 STUBS += arm64-darwin.macho-fold.h
 STUBS += i086-dos16.com.h
@@ -260,7 +263,7 @@ define tc.default.f-embed_objinfo
 	$(call tc,objcopy) -R .comment -R .note -R .note.GNU-stack -R .reginfo $1
 	$(call tc,objdump) -Dr $(tc_objdump_disasm_options) $1 | $(RTRIM) > $1.disasm
 	$(call tc,objdump) -htr -w $1 | $(BLSQUEEZE) | sed -e '1s/^.*: *file format/file format/' > $1.dump
-	$(call tc,xstrip) --with-dump=$1.dump --create-bindump=$1.bindump $1
+	$(call tc,xstrip) --with-dump=$1.dump $1
 	cat $1.dump >> $1
 endef
 
@@ -530,6 +533,61 @@ tmp/arm.v5a-linux.elf-fold.o : $(srcdir)/src/$$T.S
 tmp/armel-linux.elf-main.o : $(srcdir)/src/$$T.c $(srcdir)/src/i386-linux.elf-main.c
 	$(call tc,gcc) -c -Os $< -o $@
 	$(call tc,f-objstrip,$@)
+
+
+# /***********************************************************************
+# // arm64-linux.elf (arm64)
+# ************************************************************************/
+
+arm64-linux.elf%.h : tc_list = arm64-linux.elf default
+arm64-linux.elf%.h : tc_bfdname = elf64-littleaarch64
+
+tc.arm64-linux.elf.gcc  = arm64-linux-gcc-4.9.2 -nostdinc -MMD -MT $@
+tc.arm64-linux.elf.gcc += -fno-exceptions -fno-asynchronous-unwind-tables
+tc.arm64-linux.elf.gcc += -Wall -W -Wcast-align -Wcast-qual -Wstrict-prototypes -Wwrite-strings -Werror
+
+tc.arm64-linux.elf-fold.ld    = arm64-linux-ld-2.25
+
+tc.arm64-linux.elf-entry.objcopy  = arm64-linux-objcopy-2.25 -F elf64-littleaarch64
+tc.arm64-linux.elf-fold.objcopy   = arm64-linux-objcopy-2.25 -F elf64-littleaarch64
+tc.arm64-linux.elf-main.objcopy   = arm64-linux-objcopy-2.25 -F elf64-littleaarch64
+
+tc.arm64-linux.elf-entry.objdump  = arm64-linux-objdump-2.25
+tc.arm64-linux.elf-fold.objdump   = arm64-linux-objdump-2.25
+tc.arm64-linux.elf-main.objdump   = arm64-linux-objdump-2.25
+
+arm64-linux.elf-entry.h : $(srcdir)/src/$$T.S
+	$(call tc,gcc) -c $< -o tmp/$T.bin
+	$(call tc,f-embed_objinfo,tmp/$T.bin)
+	$(call tc,bin2h) tmp/$T.bin $@
+
+arm64-linux.elf-fold.h : tmp/$$T.o tmp/arm64-linux.elf-main.o $(srcdir)/src/arm64-linux.elf-fold.lds
+	$(call tc,ld) --strip-all -T $(srcdir)/src/arm64-linux.elf-fold.lds -Map tmp/$T.map $(filter %.o,$^) -o tmp/$T.bin
+	$(call tc,f-objstrip,tmp/$T.bin)
+	$(call tc,sstrip) tmp/$T.bin
+	$(call tc,bin2h) tmp/$T.bin $@
+
+tmp/arm64-linux.elf-fold.o : $(srcdir)/src/$$T.S
+	$(call tc,gcc) -c $< -o $@
+	$(call tc,f-objstrip,$@)
+
+tmp/arm64-linux.elf-main.o : $(srcdir)/src/$$T.c $(srcdir)/src/arm64-linux.elf-main.c
+	$(call tc,gcc) -c -Os $< -o $@
+	$(call tc,f-objstrip,$@)
+
+# /***********************************************************************
+# // arm64-linux.shlib arm64
+# ************************************************************************/
+
+arm64-linux.shlib%.h : tc_list = arm64-linux.elf default
+arm64-linux.shlib%.h : tc_bfdname = elf64-littleaarch64
+tc.arm64-linux.shlib-init.objcopy  = arm64-linux-objcopy-2.25 -F elf64-littleaarch64
+tc.arm64-linux.shlib-init.objdump  = arm64-linux-objdump-2.25
+
+arm64-linux.shlib%.h : $(srcdir)/src/$$T.S
+	$(call tc,gcc) -c -x assembler-with-cpp $< -o tmp/$T.bin
+	$(call tc,f-embed_objinfo,tmp/$T.bin)
+	$(call tc,bin2h-c) tmp/$T.bin $@
 
 
 # /***********************************************************************

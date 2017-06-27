@@ -123,7 +123,7 @@ typedef unsigned char   upx_byte;
 #undef small
 #undef tos
 #undef unix
-#if defined(__DJGPP__)
+#if (ACC_OS_DOS32) && defined(__DJGPP__)
 #  undef sopen
 #  undef __unix__
 #  undef __unix
@@ -402,6 +402,8 @@ private:
 #define UPX_F_LINUX_ELFPPC64LE  39
 #define UPX_F_VMLINUX_PPC64LE   40
 #define UPX_F_DYLIB_PPC64LE     41
+
+#define UPX_F_LINUX_ELF64_ARM   42
 
 #define UPX_F_ATARI_TOS         129
 #define UPX_F_SOLARIS_SPARC     130             // NOT IMPLEMENTED

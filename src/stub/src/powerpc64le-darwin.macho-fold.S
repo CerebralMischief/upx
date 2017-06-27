@@ -29,9 +29,9 @@
 *  <jreiser@users.sourceforge.net>
 */
 
-#include "arch/powerpc/32/macros.S"
-#include "arch/powerpc/32/ppc_regs.h"
-retaddr = 2*4  // (sp,cr,pc, xx,yy,zz) save area per calling convention
+#include "arch/powerpc/64le/macros.S"
+#include "arch/powerpc/64le/ppc_regs.h"
+retaddr = 2*8
 
 sz_b_info= 12
   sz_unc= 0
@@ -58,11 +58,12 @@ _start: .globl _start  # ignored, but silence "cannot find entry symbol _start" 
    r31= &decompress; also 8+ (char *)&(offset to {l_info; p_info; b_info})
 */
 fold_begin:
+    teq r0,r0  // this code has not been converted to 64-bit!!
         call L90
 #include "arch/powerpc/32/bxx.S"
 
 L90:
-        la sp,6*4(sp)  // trim save area used by decompressor
+        la sp,SZ_FRAME(sp)  // trim save area used by decompressor
         li   a6,0
         stwu a6,-4(sp)  # _push_ default value for dyld
         movr a6,sp  # &mhdrp
@@ -71,12 +72,12 @@ L90:
         lwz a1,-8(r31)  # offset to {l_info; p_info; b_info}
         subf a0,a1,r31  # &l_info
         lwz a3,sz_unc+sz_p_info+sz_l_info(a0)  # sz_mach_headers
-        cmpli 0,a3,2048; bgt L100; li a3,2048  # at least 2 KiB for /usr/lib/dyld
+        cmplwi cr0,a3,2048; bgt L100; li a3,2048  # at least 2 KiB for /usr/lib/dyld
 L100:
         movr r29,sp  # remember for restoring later
         subf sp,a3,sp  # alloca
         movr a2,sp  # &temp char[sz_mach_headers]
-        addi sp,sp,-4*6  # linkage area assumed by C code (sp,cr,lr, xx,yy,zz)
+        stdu sp,-SZ_FRAME(sp)  # ABI convention
         movr a4,r31  # f_decompress
         call upx_main  # Out: a0= &Mach_ppc_thread_state of dyld
 
@@ -129,5 +130,7 @@ close: .globl close
         li 0,SYS_close; b sysgo
 mprotect: .globl mprotect
         li 0,SYS_mprotect; b sysgo
+
+#include "powerpc64-savegpr0.S"
 
 /* vim:set ts=8 sw=8 et: */

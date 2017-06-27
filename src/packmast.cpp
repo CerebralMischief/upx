@@ -25,7 +25,6 @@
    <markus@oberhumer.com>               <ezerotven+github@gmail.com>
  */
 
-
 #include "conf.h"
 #include "file.h"
 #include "packmast.h"
@@ -54,56 +53,48 @@
 #include "p_mach.h"
 #include "p_armpe.h"
 
-
 /*************************************************************************
 //
 **************************************************************************/
 
-PackMaster::PackMaster(InputFile *f, options_t *o) :
-    fi(f), p(NULL)
-{
+PackMaster::PackMaster(InputFile *f, options_t *o) : fi(f), p(NULL) {
     // replace global options with local options
     saved_opt = o;
-    if (o)
-    {
+    if (o) {
         memcpy(&this->local_options, o, sizeof(*o)); // struct copy
         opt = &this->local_options;
     }
 }
 
-
-PackMaster::~PackMaster()
-{
+PackMaster::~PackMaster() {
     fi = NULL;
-    delete p; p = NULL;
+    delete p;
+    p = NULL;
     // restore global options
     if (saved_opt)
         opt = saved_opt;
     saved_opt = NULL;
 }
 
-
 /*************************************************************************
 //
 **************************************************************************/
 
-static Packer* try_pack(Packer *p, void *user)
-{
+static Packer *try_pack(Packer *p, void *user) {
     if (p == NULL)
         return NULL;
     InputFile *f = (InputFile *) user;
     p->assertPacker();
     try {
         p->initPackHeader();
-        f->seek(0,SEEK_SET);
-        if (p->canPack())
-        {
+        f->seek(0, SEEK_SET);
+        if (p->canPack()) {
             if (opt->cmd == CMD_COMPRESS)
                 p->updatePackHeader();
-            f->seek(0,SEEK_SET);
+            f->seek(0, SEEK_SET);
             return p;
         }
-    } catch (const IOException&) {
+    } catch (const IOException &) {
     } catch (...) {
         delete p;
         throw;
@@ -112,28 +103,24 @@ static Packer* try_pack(Packer *p, void *user)
     return NULL;
 }
 
-
-static Packer* try_unpack(Packer *p, void *user)
-{
+static Packer *try_unpack(Packer *p, void *user) {
     if (p == NULL)
         return NULL;
     InputFile *f = (InputFile *) user;
     p->assertPacker();
     try {
         p->initPackHeader();
-        f->seek(0,SEEK_SET);
+        f->seek(0, SEEK_SET);
         int r = p->canUnpack();
-        if (r > 0)
-        {
-            f->seek(0,SEEK_SET);
+        if (r > 0) {
+            f->seek(0, SEEK_SET);
             return p;
         }
-        if (r < 0)
-        {
+        if (r < 0) {
             // FIXME - could stop testing all other unpackers at this time
             // see canUnpack() in packer.h
         }
-    } catch (const IOException&) {
+    } catch (const IOException &) {
     } catch (...) {
         delete p;
         throw;
@@ -142,193 +129,110 @@ static Packer* try_unpack(Packer *p, void *user)
     return NULL;
 }
 
-
 /*************************************************************************
 //
 **************************************************************************/
 
-Packer* PackMaster::visitAllPackers(visit_func_t func, InputFile *f, const options_t *o, void *user)
-{
+Packer *PackMaster::visitAllPackers(visit_func_t func, InputFile *f, const options_t *o,
+                                    void *user) {
     Packer *p = NULL;
+
+#define D(klass)                                                                                   \
+    ACC_BLOCK_BEGIN                                                                                \
+    if (o->debug.debug_level)                                                                      \
+        fprintf(stderr, "visitAllPackers: %s\n", #klass);                                          \
+    if ((p = func(new klass(f), user)) != NULL)                                                    \
+        return p;                                                                                  \
+    ACC_BLOCK_END
 
     // note: order of tries is important !
 
     //
     // .exe
     //
-    if (!o->dos_exe.force_stub)
-    {
-        if ((p = func(new PackDjgpp2(f), user)) != NULL)
-            return p;
-        delete p; p = NULL;
-        if ((p = func(new PackTmt(f), user)) != NULL)
-            return p;
-        delete p; p = NULL;
-        if ((p = func(new PackWcle(f), user)) != NULL)
-            return p;
-        delete p; p = NULL;
-        if ((p = func(new PackW64Pep(f), user)) != NULL)
-            return p;
-        delete p; p = NULL;
-        if ((p = func(new PackW32Pe(f), user)) != NULL)
-            return p;
-        delete p; p = NULL;
+    if (!o->dos_exe.force_stub) {
+        D(PackDjgpp2);
+        D(PackTmt);
+        D(PackWcle);
+        D(PackW64Pep);
+        D(PackW32Pe);
     }
-    if ((p = func(new PackArmPe(f), user)) != NULL)
-        return p;
-    delete p; p = NULL;
-    if ((p = func(new PackExe(f), user)) != NULL)
-        return p;
-    delete p; p = NULL;
+    D(PackArmPe);
+    D(PackExe);
 
     //
     // atari
     //
-    if ((p = func(new PackTos(f), user)) != NULL)
-        return p;
-    delete p; p = NULL;
+    D(PackTos);
 
     //
     // linux kernel
     //
-    if ((p = func(new PackVmlinuxARMEL(f), user)) != NULL)
-        return p;
-    delete p; p = NULL;
-    if ((p = func(new PackVmlinuxARMEB(f), user)) != NULL)
-        return p;
-    delete p; p = NULL;
-    if ((p = func(new PackVmlinuxPPC32(f), user)) != NULL)
-        return p;
-    delete p; p = NULL;
-    if ((p = func(new PackVmlinuxPPC64LE(f), user)) != NULL)
-        return p;
-    delete p; p = NULL;
-    if ((p = func(new PackVmlinuxAMD64(f), user)) != NULL)
-        return p;
-    delete p; p = NULL;
-    if ((p = func(new PackVmlinuxI386(f), user)) != NULL)
-        return p;
-    delete p; p = NULL;
-    if ((p = func(new PackVmlinuzI386(f), user)) != NULL)
-        return p;
-    delete p; p = NULL;
-    if ((p = func(new PackBvmlinuzI386(f), user)) != NULL)
-        return p;
-    delete p; p = NULL;
-    if ((p = func(new PackVmlinuzARMEL(f), user)) != NULL)
-        return p;
-    delete p; p = NULL;
+    D(PackVmlinuxARMEL);
+    D(PackVmlinuxARMEB);
+    D(PackVmlinuxPPC32);
+    D(PackVmlinuxPPC64LE);
+    D(PackVmlinuxAMD64);
+    D(PackVmlinuxI386);
+    D(PackVmlinuzI386);
+    D(PackBvmlinuzI386);
+    D(PackVmlinuzARMEL);
 
     //
     // linux
     //
-    if (!o->o_unix.force_execve)
-    {
+    if (!o->o_unix.force_execve) {
         if (o->o_unix.use_ptinterp) {
-            if ((p = func(new PackLinuxElf32x86interp(f), user)) != NULL)
-                return p;
-            delete p; p = NULL;
+            D(PackLinuxElf32x86interp);
         }
-        if ((p = func(new PackFreeBSDElf32x86(f), user)) != NULL)
-            return p;
-        delete p; p = NULL;
-        if ((p = func(new PackNetBSDElf32x86(f), user)) != NULL)
-            return p;
-        delete p; p = NULL;
-        if ((p = func(new PackOpenBSDElf32x86(f), user)) != NULL)
-            return p;
-        delete p; p = NULL;
-        if ((p = func(new PackLinuxElf32x86(f), user)) != NULL)
-            return p;
-        delete p; p = NULL;
-        if ((p = func(new PackLinuxElf64amd(f), user)) != NULL)
-            return p;
-        delete p; p = NULL;
-        if ((p = func(new PackLinuxElf32armLe(f), user)) != NULL)
-            return p;
-        delete p; p = NULL;
-        if ((p = func(new PackLinuxElf32armBe(f), user)) != NULL)
-            return p;
-        delete p; p = NULL;
-        if ((p = func(new PackLinuxElf32ppc(f), user)) != NULL)
-            return p;
-        delete p; p = NULL;
-        if ((p = func(new PackLinuxElf64ppcle(f), user)) != NULL)
-            return p;
-        delete p; p = NULL;
-        if ((p = func(new PackLinuxElf32mipsel(f), user)) != NULL)
-            return p;
-        delete p; p = NULL;
-        if ((p = func(new PackLinuxElf32mipseb(f), user)) != NULL)
-            return p;
-        delete p; p = NULL;
-        if ((p = func(new PackLinuxI386sh(f), user)) != NULL)
-            return p;
-        delete p; p = NULL;
+        D(PackFreeBSDElf32x86);
+        D(PackNetBSDElf32x86);
+        D(PackOpenBSDElf32x86);
+        D(PackLinuxElf32x86);
+        D(PackLinuxElf64amd);
+        D(PackLinuxElf32armLe);
+        D(PackLinuxElf32armBe);
+        D(PackLinuxElf64arm);
+        D(PackLinuxElf32ppc);
+        D(PackLinuxElf64ppcle);
+        D(PackLinuxElf32mipsel);
+        D(PackLinuxElf32mipseb);
+        D(PackLinuxI386sh);
     }
-    if ((p = func(new PackBSDI386(f), user)) != NULL)
-        return p;
-    delete p; p = NULL;
-    if ((p = func(new PackMachFat(f), user)) != NULL)  // cafebabe conflict
-        return p;
-    delete p; p = NULL;
-    if ((p = func(new PackLinuxI386(f), user)) != NULL)  // cafebabe conflict
-        return p;
-    delete p; p = NULL;
+    D(PackBSDI386);
+    D(PackMachFat);   // cafebabe conflict
+    D(PackLinuxI386); // cafebabe conflict
 
     //
     // psone
     //
-    if ((p = func(new PackPs1(f), user)) != NULL)
-        return p;
-    delete p; p = NULL;
+    D(PackPs1);
 
     //
     // .sys and .com
     //
-    if ((p = func(new PackSys(f), user)) != NULL)
-        return p;
-    delete p; p = NULL;
-    if ((p = func(new PackCom(f), user)) != NULL)
-        return p;
-    delete p; p = NULL;
+    D(PackSys);
+    D(PackCom);
 
     // Mach (MacOS X PowerPC)
-    if ((p = func(new PackMachPPC32(f), user)) != NULL)
-        return p;
-    delete p; p = NULL;
-    if ((p = func(new PackMachPPC64LE(f), user)) != NULL)
-        return p;
-    delete p; p = NULL;
-    if ((p = func(new PackMachI386(f), user)) != NULL)
-        return p;
-    delete p; p = NULL;
-    if ((p = func(new PackMachAMD64(f), user)) != NULL)
-        return p;
-    delete p; p = NULL;
-    if ((p = func(new PackMachARMEL(f), user)) != NULL)
-        return p;
-    delete p; p = NULL;
+    D(PackMachPPC32);
+    D(PackMachPPC64LE);
+    D(PackMachI386);
+    D(PackMachAMD64);
+    D(PackMachARMEL);
 
     // 2010-03-12  omit these because PackMachBase<T>::pack4dylib (p_mach.cpp)
     // does not understand what the Darwin (Apple Mac OS X) dynamic loader
     // assumes about .dylib file structure.
-    //if ((p = func(new PackDylibI386(f), user)) != NULL)
-    //    return p;
-    //delete p; p = NULL;
-    //if ((p = func(new PackDylibPPC32(f), user)) != NULL)
-    //    return p;
-    //delete p; p = NULL;
-    //if ((p = func(new PackDylibAMD64(f), user)) != NULL)
-    //    return p;
-    //delete p; p = NULL;
+    //   D(PackDylibI386);
+    //   D(PackDylibPPC32);
+    //   D(PackDylibAMD64);
 
     return NULL;
+#undef D
 }
 
-
-Packer *PackMaster::getPacker(InputFile *f)
-{
+Packer *PackMaster::getPacker(InputFile *f) {
     Packer *pp = visitAllPackers(try_pack, f, opt, f);
     if (!pp)
         throwUnknownExecutableFormat();
@@ -336,9 +240,7 @@ Packer *PackMaster::getPacker(InputFile *f)
     return pp;
 }
 
-
-Packer *PackMaster::getUnpacker(InputFile *f)
-{
+Packer *PackMaster::getUnpacker(InputFile *f) {
     Packer *pp = visitAllPackers(try_unpack, f, opt, f);
     if (!pp)
         throwNotPacked();
@@ -346,51 +248,41 @@ Packer *PackMaster::getUnpacker(InputFile *f)
     return pp;
 }
 
-
 /*************************************************************************
 // delegation
 **************************************************************************/
 
-void PackMaster::pack(OutputFile *fo)
-{
+void PackMaster::pack(OutputFile *fo) {
     p = getPacker(fi);
     fi = NULL;
     p->doPack(fo);
 }
 
-
-void PackMaster::unpack(OutputFile *fo)
-{
+void PackMaster::unpack(OutputFile *fo) {
     p = getUnpacker(fi);
     p->assertPacker();
     fi = NULL;
     p->doUnpack(fo);
 }
 
-
-void PackMaster::test()
-{
+void PackMaster::test() {
     p = getUnpacker(fi);
     fi = NULL;
     p->doTest();
 }
 
-
-void PackMaster::list()
-{
+void PackMaster::list() {
     p = getUnpacker(fi);
     fi = NULL;
     p->doList();
 }
 
-
-void PackMaster::fileInfo()
-{
+void PackMaster::fileInfo() {
     p = visitAllPackers(try_unpack, fi, opt, fi);
     if (!p)
         p = visitAllPackers(try_pack, fi, opt, fi);
     if (!p)
-        throwUnknownExecutableFormat(NULL, 1);    // make a warning here
+        throwUnknownExecutableFormat(NULL, 1); // make a warning here
     p->assertPacker();
     fi = NULL;
     p->doFileInfo();

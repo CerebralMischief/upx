@@ -4,6 +4,7 @@
 
    Copyright (C) 1996-2017 Markus Franz Xaver Johannes Oberhumer
    Copyright (C) 1996-2017 Laszlo Molnar
+   Copyright (C) 2000-2017 John F. Reiser
    All Rights Reserved.
 
    UPX and the UCL library are free software; you can redistribute them
@@ -23,6 +24,9 @@
 
    Markus F.X.J. Oberhumer              Laszlo Molnar
    <markus@oberhumer.com>               <ezerotven+github@gmail.com>
+
+   John F. Reiser
+   <jreiser@users.sourceforge.net>
  */
 
 
@@ -242,8 +246,14 @@ PackUnix::patchLoaderChecksum()
     set_te32(&lp->l_checksum, upx_adler32(ptr, lsize));
 }
 
-void PackUnix::pack3(OutputFile *fo, Filter &/*ft*/)
+void PackUnix::pack3(OutputFile *fo, Filter &ft)
 {
+    if (0==linker) {
+        // If no filter, then linker is not constructed by side effect
+        // of packExtent calling compressWithFilters.
+        // This is typical after "/usr/bin/patchelf --set-rpath".
+        buildLoader(&ft);
+    }
     upx_byte *p = getLoader();
     lsize = getLoaderSize();
     updateLoader(fo);
@@ -438,7 +448,7 @@ void PackUnix::packExtent(
 void PackUnix::unpackExtent(unsigned wanted, OutputFile *fo,
     unsigned &total_in, unsigned &total_out,
     unsigned &c_adler, unsigned &u_adler,
-    bool first_PF_X, unsigned szb_info
+    bool first_PF_X, unsigned szb_info, bool is_rewrite
 )
 {
     b_info hdr; memset(&hdr, 0, sizeof(hdr));
@@ -491,8 +501,14 @@ void PackUnix::unpackExtent(unsigned wanted, OutputFile *fo,
         total_in  += sz_cpr;
         total_out += sz_unc;
         // write block
-        if (fo)
-            fo->write(ibuf + j, sz_unc);
+        if (fo) {
+            if (is_rewrite) {
+                fo->rewrite(ibuf + j, sz_unc);
+            }
+            else {
+                fo->write(ibuf + j, sz_unc);
+            }
+        }
         if (wanted < (unsigned)sz_unc)
             throwCantUnpack("corrupt b_info");
         wanted -= sz_unc;
